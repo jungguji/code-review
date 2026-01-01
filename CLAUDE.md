@@ -11,11 +11,22 @@ pip install -r requirements.txt
 # Initialize RAG documents (run once before first use)
 python init_rag_docs.py
 
-# Run code review on unstaged git changes
+# Run code review (staged + unstaged changes by default)
 python main.py
 ```
 
 Output is written to `code_review_report.md`.
+
+### Git Diff Modes
+
+```python
+from git_analyzer import GitManager, DiffMode
+
+GitManager()                                              # ALL (default): staged + unstaged
+GitManager(diff_mode=DiffMode.STAGED)                     # staged only
+GitManager(diff_mode=DiffMode.UNSTAGED)                   # unstaged only
+GitManager(diff_mode=DiffMode.BRANCH, base_ref="main")    # branch comparison
+```
 
 ## Architecture
 
@@ -40,7 +51,9 @@ ReviewAgent × 3 → Parallel LLM calls → Aggregated markdown report
 | `llm_interface.py` | `LLMProvider` | Abstract base class (Strategy Pattern) for LLM swapping |
 | `llm_interface.py` | `OllamaClient` | Local LLM implementation using Ollama |
 | `rag_engine.py` | `RAGService` | ChromaDB vector search with category filtering |
-| `git_analyzer.py` | `GitManager` | Extracts diff, file content, and project structure |
+| `rag_engine.py` | `preprocess_diff_for_query()` | Cleans diff symbols for better RAG search |
+| `git_analyzer.py` | `DiffMode` | Enum for diff modes (UNSTAGED, STAGED, ALL, BRANCH, COMMIT) |
+| `git_analyzer.py` | `GitManager` | Extracts diff, file content, project structure via `git ls-files` |
 | `review_agents.py` | `ReviewAgent` | Combines RAG context + LLM generation |
 | `init_rag_docs.py` | - | Seeds RAG with domain/security/convention rules |
 
@@ -61,7 +74,5 @@ Documents are filtered by category metadata: `domain`, `security`, `convention`.
 
 - No error handling - crashes on Ollama unavailable, non-git directory, encoding errors
 - Token limit risk with large files/projects
-- Only detects unstaged changes (`git diff` without args)
-- RAG queries include raw diff symbols (+, -, @@)
 - No CLI arguments - model name and paths are hardcoded
 - Re-running `init_rag_docs.py` causes duplicate ID errors
